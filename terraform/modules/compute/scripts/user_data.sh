@@ -71,7 +71,9 @@ su - "$OPENCLAW_USER" -c "git clone https://github.com/openclaw/openclaw.git /ho
 
 # --- Prepare OpenClaw directories ---
 su - "$OPENCLAW_USER" -c "mkdir -p /home/$OPENCLAW_USER/.openclaw/workspace"
-chown -R "$OPENCLAW_USER:$OPENCLAW_USER" "/home/$OPENCLAW_USER/.openclaw"
+# Docker container runs as 'node' (uid 1000) -- must match ownership
+chown -R 1000:1000 "/home/$OPENCLAW_USER/.openclaw"
+chmod -R 775 "/home/$OPENCLAW_USER/.openclaw"
 chmod -R 775 "/home/$OPENCLAW_USER/openclaw"
 
 echo "=== OpenClaw EC2 bootstrap completed at $(date) ==="
