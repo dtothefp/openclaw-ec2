@@ -76,6 +76,19 @@ chown -R 1000:1000 "/home/$OPENCLAW_USER/.openclaw"
 chmod -R 775 "/home/$OPENCLAW_USER/.openclaw"
 chmod -R 775 "/home/$OPENCLAW_USER/openclaw"
 
+# Pre-seed config to allow dashboard access over HTTP (SSH tunnel)
+cat > "/home/$OPENCLAW_USER/.openclaw/openclaw.json" <<'CFGEOF'
+{
+  "gateway": {
+    "controlUi": {
+      "enabled": true,
+      "allowInsecureAuth": true
+    }
+  }
+}
+CFGEOF
+chown 1000:1000 "/home/$OPENCLAW_USER/.openclaw/openclaw.json"
+
 echo "=== OpenClaw EC2 bootstrap completed at $(date) ==="
 echo "SSH into this instance on port $SSH_PORT as user '$OPENCLAW_USER'"
 echo "Then run: cd ~/openclaw && ./docker-setup.sh"

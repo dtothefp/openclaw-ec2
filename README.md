@@ -10,7 +10,7 @@ Terraform configuration for deploying [OpenClaw](https://openclaw.ai) on AWS EC2
 - **SSH on port 2222** with key-only auth, root login disabled
 - **UFW firewall** denying all inbound except custom SSH port
 - **S3 backend** for Terraform state (versioned, encrypted, no public access)
-- **GitHub Actions** CI/CD: plan on PR, apply on merge to main
+- **GitHub Actions** CI/CD: plan on PR, apply via manual workflow_dispatch (OIDC auth)
 
 ## Prerequisites
 
@@ -19,8 +19,7 @@ Terraform configuration for deploying [OpenClaw](https://openclaw.ai) on AWS EC2
 3. **API key** from [Anthropic](https://console.anthropic.com/) or [OpenAI](https://platform.openai.com/api-keys)
 4. **Terraform >= 1.5** installed locally (for initial bootstrap)
 5. **GitHub repository** with these secrets configured (for CI/CD):
-   - `AWS_ACCESS_KEY_ID`
-   - `AWS_SECRET_ACCESS_KEY`
+   - `PRODUCTION_GITHUB_ACTIONS_ROLE_ARN` (output from backend bootstrap)
    - `SSH_PUBLIC_KEY` (contents of your `.pub` file)
    - `ALLOWED_SSH_CIDRS` (JSON list, e.g. `'["1.2.3.4/32"]'`)
 
@@ -63,7 +62,7 @@ terraform apply
 ```
 
 **Via GitHub Actions:**
-Push to a PR to see the plan. Merge to `main` to apply.
+Push to a PR to see the plan as a PR comment. Trigger the `terraform-apply` workflow manually via `workflow_dispatch` to apply.
 
 ### Step 5: Note the Outputs
 
@@ -102,20 +101,21 @@ The onboarding wizard will prompt you. Recommended selections:
 
 | Prompt | Selection |
 |---|---|
-| Accept risk warning | Yes |
-| Onboarding mode | Manual |
-| Gateway setup | Local gateway (this machine) |
-| Workspace directory | Press Enter (accept default) |
-| Model provider | Anthropic (or OpenAI) |
-| API key | Paste your key |
-| Default model | claude-sonnet-4-5 (or your preference) |
-| Gateway port | 18789 (default) |
-| Gateway bind | localhost (or Tailnet if using Tailscale) |
+| Gateway mode | Local gateway |
+| Gateway bind | **LAN (0.0.0.0)** -- required for Docker port mapping |
 | Gateway auth | Token |
-| Gateway token | Press Enter to auto-generate, then **save it** |
+| Gateway token | Press Enter to auto-generate |
+| Tailscale exposure | Off |
+| Install daemon | No |
+| API key | Paste your Anthropic (or OpenAI) key |
 | Configure chat channels | Yes |
+| Channel type | Telegram (Bot API), then paste your bot token |
+| Add another channel | **Finish** (do NOT press ESC) |
+| Configure DM access policies | No (default pairing is fine) |
 | Configure skills | No (can add later) |
 | Enable hooks | Skip for now |
+
+**Important:** Complete every prompt -- do not press ESC to exit early. The config file (`~/.openclaw/openclaw.json`) is only written when the wizard finishes.
 
 ### 3. Set Up WhatsApp (Optional)
 
@@ -130,61 +130,84 @@ docker compose run --rm openclaw-cli channels login
 
 **Important:** Use a spare phone number, not your personal one. WhatsApp sessions can disconnect and need re-pairing.
 
-### 4. Set Up Telegram (Optional)
+### 4. Set Up Telegram
 
 1. Open Telegram and chat with `@BotFather`
 2. Send `/newbot` and follow the prompts to create your bot
-3. Copy the bot token BotFather gives you
-4. Add it to OpenClaw:
+3. Copy the bot token BotFather gives you (format: `123456789:ABCdefGHI...`)
+4. During the onboarding wizard (step 2), select **Telegram (Bot API)** and paste the token
+
+If you need to add Telegram **after** initial setup:
 
 ```bash
-docker compose run --rm openclaw-cli channels add --channel telegram --token "YOUR_BOT_TOKEN"
+cd ~/openclaw
+docker compose run --rm openclaw-cli channels add
 ```
 
-5. Restart the gateway:
+Follow the interactive prompts, then restart the gateway:
 
 ```bash
-docker compose restart
+docker compose restart openclaw-gateway
 ```
-
-6. Open Telegram, search for your bot, and send it a message
 
 ### 5. Access the Web Dashboard
 
 From your local machine, set up an SSH tunnel:
 
 ```bash
-ssh -p 2222 -i ~/.ssh/your-key -L 18789:localhost:18789 openclaw@<elastic-ip>
+ssh -p 2222 -i ~/.ssh/your-key -N -L 18789:127.0.0.1:18789 openclaw@<elastic-ip>
 ```
 
-Then open http://localhost:18789 in your browser. Go to **Overview > Gateway Token**, paste the token from step 2, and click **Connect**.
+Then open this URL in your browser (replace `<token>` with your gateway token from the `.env` file):
 
-### 6. Enable HTTP Auth (Required for Dashboard)
+```
+http://localhost:18789/#token=<token>
+```
 
-Since we access over HTTP (via SSH tunnel, which encrypts the traffic), we need to allow insecure auth:
+To retrieve the gateway token:
 
 ```bash
-# Install jq in the container
-docker compose exec -u root openclaw-gateway bash -c "apt update && apt install -y jq"
-
-# Enable insecure auth
-docker compose exec -T openclaw-gateway bash -c '
-jq ".gateway.controlUi.allowInsecureAuth = true" \
-/home/node/.openclaw/openclaw.json > /home/node/.openclaw/tmp.json && \
-mv /home/node/.openclaw/tmp.json /home/node/.openclaw/openclaw.json'
-
-# Restart to apply
-docker compose restart
+grep OPENCLAW_GATEWAY_TOKEN ~/openclaw/.env
 ```
 
-This is safe because the SSH tunnel already encrypts all traffic end-to-end.
+> **Note:** The `user_data.sh` bootstrap script pre-configures `controlUi.allowInsecureAuth: true` so the dashboard works over HTTP (the SSH tunnel encrypts traffic end-to-end). No manual config changes needed.
 
-### 7. Verify Everything Works
+> **Token mismatch:** The `.env` file (used by the Docker container) and `~/.openclaw/openclaw.json` (used by the wizard) may have different tokens. The running gateway uses the `.env` token. If the dashboard shows "pairing required", verify the token in your URL matches the one in `.env`.
+
+### 6. Verify Everything Works
 
 1. Chat via the web dashboard at http://localhost:18789
 2. Send a message via WhatsApp or Telegram
 3. Check container health: `docker compose ps`
 4. View logs: `docker compose logs -f`
+
+### 7. Daily Operations
+
+You only need to run `./docker-setup.sh` **once** for initial setup. After that:
+
+```bash
+cd ~/openclaw
+
+# Start the gateway
+docker compose up -d openclaw-gateway
+
+# Stop the gateway
+docker compose down
+
+# Restart after config changes
+docker compose restart openclaw-gateway
+
+# View live logs
+docker compose logs -f openclaw-gateway
+
+# Add a channel after initial setup
+docker compose run --rm openclaw-cli channels add
+
+# Update OpenClaw to latest
+cd ~/openclaw && git pull
+docker compose down
+./docker-setup.sh
+```
 
 ### 8. Post-Setup Hardening
 
@@ -221,7 +244,7 @@ terraform destroy
 
 ```
 terraform/
-  backend/                    # S3 state bucket (one-time bootstrap)
+  backend/                    # S3 state bucket + OIDC role (one-time bootstrap)
   modules/
     networking/               # VPC, subnet, IGW, route tables
     security/                 # Security group, IAM, key pair
@@ -231,5 +254,6 @@ terraform/
     prod/                     # Root module wiring everything together
 .github/
   workflows/
-    terraform.yml             # CI/CD: plan on PR, apply on merge
+    terraform-plan.yml        # Runs plan on PRs, posts output as PR comment
+    terraform-apply.yml       # Runs apply on manual workflow_dispatch
 ```
