@@ -150,7 +150,49 @@ Follow the interactive prompts, then restart the gateway:
 docker compose restart openclaw-gateway
 ```
 
-### 5. Access the Web Dashboard
+### 5. Set Up Google Workspace (gog)
+
+The bootstrap script pre-installs [gog](https://github.com/rubiojr/gog) and creates the config directories. To connect your Google accounts:
+
+1. **Add env vars** to `~/openclaw/.env`:
+
+```bash
+GOG_ACCOUNT=you@example.com
+GOG_KEYRING_PASSWORD=your-keyring-password
+```
+
+2. **Authenticate** on the EC2 host (not inside Docker):
+
+```bash
+export GOG_KEYRING_PASSWORD="your-keyring-password"
+gog auth add you@example.com --services gmail,calendar,drive
+```
+
+gog will print an OAuth URL with a callback port (e.g. `127.0.0.1:PORT`). Open an SSH tunnel for that port from your local machine:
+
+```bash
+ssh -p 2222 -i ~/.ssh/your-key -N -L PORT:127.0.0.1:PORT openclaw@<elastic-ip>
+```
+
+Then open the OAuth URL in your browser and complete sign-in.
+
+3. **Fix token permissions** so the Docker container can read them:
+
+```bash
+sudo chmod 644 ~/.config/gogcli/keyring/token:*
+```
+
+4. **Test from the container**:
+
+```bash
+docker compose exec openclaw-gateway gog gmail search "is:unread" --max 3
+```
+
+> **Multiple accounts:** Repeat the `gog auth add` step for each Google account. Each auth generates a new callback port that needs its own SSH tunnel. To add accounts with many services, split into smaller batches (e.g. `gmail,calendar` then `drive,contacts`) to avoid URL truncation issues in the browser.
+
+> **Permissions note:** The `~/.config/gogcli` directory is set to `777` so both the host user and Docker container (uid 1000) can access it. After each `gog auth add`, token files default to `600` (owner-only) -- the `chmod 644` step above is required after every new auth.
+
+### 6. Access the Web Dashboard
 
 From your local machine, set up an SSH tunnel:
 
@@ -174,14 +216,14 @@ grep OPENCLAW_GATEWAY_TOKEN ~/openclaw/.env
 
 > **Token mismatch:** The `.env` file (used by the Docker container) and `~/.openclaw/openclaw.json` (used by the wizard) may have different tokens. The running gateway uses the `.env` token. If the dashboard shows "pairing required", verify the token in your URL matches the one in `.env`.
 
-### 6. Verify Everything Works
+### 7. Verify Everything Works
 
 1. Chat via the web dashboard at http://localhost:18789
 2. Send a message via WhatsApp or Telegram
 3. Check container health: `docker compose ps`
 4. View logs: `docker compose logs -f`
 
-### 7. Daily Operations
+### 8. Daily Operations
 
 You only need to run `./docker-setup.sh` **once** for initial setup. After that:
 
@@ -209,7 +251,7 @@ docker compose down
 ./docker-setup.sh
 ```
 
-### 8. Post-Setup Hardening
+### 9. Post-Setup Hardening
 
 - **Set API spend limits**: Go to your Anthropic/OpenAI console and set a monthly budget
 - **Enable sandbox mode**: OpenClaw defaults to sandboxed tool execution in Docker containers

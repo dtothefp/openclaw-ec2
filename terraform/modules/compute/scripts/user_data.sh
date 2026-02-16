@@ -76,6 +76,44 @@ chown -R 1000:1000 "/home/$OPENCLAW_USER/.openclaw"
 chmod -R 775 "/home/$OPENCLAW_USER/.openclaw"
 chmod -R 775 "/home/$OPENCLAW_USER/openclaw"
 
+# --- Prepare gog (Google Workspace CLI) directories ---
+# Both the host user and Docker container (uid 1000) need read/write access.
+# Directories are 777 so either user can create files.
+# After running `gog auth add`, token files default to 600 (owner-only).
+# Fix with: sudo chmod 644 ~/.config/gogcli/keyring/token:*
+# so the container's node user can read them.
+GOG_CONFIG="/home/$OPENCLAW_USER/.config/gogcli"
+su - "$OPENCLAW_USER" -c "mkdir -p $GOG_CONFIG/keyring"
+chmod -R 777 "$GOG_CONFIG"
+
+# Install gog binary
+GOG_VERSION="0.11.0"
+curl -fsSL "https://github.com/rubiojr/gog/releases/download/v$GOG_VERSION/gog_${GOG_VERSION}_linux_amd64.tar.gz" \
+  | tar -xz -C /usr/local/bin gog
+chmod 755 /usr/local/bin/gog
+
+# --- Pre-seed docker-compose.override.yml ---
+# Mounts gog binary + config into the container and passes env vars.
+# LINEAR_API_KEY and LINEAR_DEFAULT_TEAM are read from .env at runtime.
+# GOG_KEYRING_PASSWORD must match the password used during `gog auth add`.
+cat > "/home/$OPENCLAW_USER/openclaw/docker-compose.override.yml" <<'DCEOF'
+services:
+  openclaw-gateway:
+    environment:
+      LINEAR_API_KEY: ${LINEAR_API_KEY}
+      LINEAR_DEFAULT_TEAM: ${LINEAR_DEFAULT_TEAM}
+      GOG_ACCOUNT: ${GOG_ACCOUNT}
+      GOG_KEYRING_PASSWORD: ${GOG_KEYRING_PASSWORD}
+    volumes:
+      - /usr/local/bin/gog:/usr/local/bin/gog:ro
+      - /home/openclaw/.config/gogcli:/home/node/.config/gogcli
+  openclaw-cli:
+    environment:
+      LINEAR_API_KEY: ${LINEAR_API_KEY}
+      LINEAR_DEFAULT_TEAM: ${LINEAR_DEFAULT_TEAM}
+DCEOF
+chown "$OPENCLAW_USER:$OPENCLAW_USER" "/home/$OPENCLAW_USER/openclaw/docker-compose.override.yml"
+
 # Pre-seed config to allow dashboard access over HTTP (SSH tunnel)
 cat > "/home/$OPENCLAW_USER/.openclaw/openclaw.json" <<'CFGEOF'
 {
