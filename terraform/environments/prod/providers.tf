@@ -9,7 +9,7 @@ terraform {
   }
 
   backend "s3" {
-    bucket = "REPLACE_WITH_YOUR_BUCKET_NAME"
+    bucket = "openclaw-tfstate-production"
     key    = "openclaw/prod/terraform.tfstate"
     region = "us-west-2"
   }
