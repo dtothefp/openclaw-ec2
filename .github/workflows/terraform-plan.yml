@@ -1,0 +1,71 @@
+name: "Terraform Plan"
+
+on:
+  pull_request:
+    paths:
+      - "terraform/**"
+      - ".github/workflows/terraform-*.yml"
+
+env:
+  AWS_REGION: us-west-2
+  ENVIRONMENT: production
+  PROJECT_NAME: openclaw
+  TF_WORKING_DIR: terraform/environments/prod
+
+jobs:
+  terraform:
+    name: "Terraform Plan - Production"
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+
+    defaults:
+      run:
+        working-directory: ${{ env.TF_WORKING_DIR }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.PRODUCTION_GITHUB_ACTIONS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.0"
+          terraform_wrapper: false
+
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive
+        continue-on-error: true
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        run: terraform plan -no-color -input=false -out=tfplan
+        env:
+          TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
+          TF_VAR_allowed_ssh_cidrs: ${{ secrets.ALLOWED_SSH_CIDRS }}
+
+      - name: Generate Plan JSON
+        run: terraform show -json tfplan > plan.json
+
+      - name: Post Terraform Plan Comment
+        uses: liatrio/terraform-change-pr-commenter@v1.14.0
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          json-file: ${{ env.TF_WORKING_DIR }}/plan.json
+          hide-previous-comments: true
+          expand-comment: true
+          comment-header: "Terraform Plan for OpenClaw Production"
