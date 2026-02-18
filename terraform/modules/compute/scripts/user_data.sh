@@ -37,8 +37,10 @@ PubkeyAuthentication yes
 SSHEOF
 
 # Disable systemd socket activation (Ubuntu 24.04 holds port 22 open otherwise)
+# Must enable ssh.service explicitly, otherwise SSH won't start on reboot
 systemctl stop ssh.socket || true
 systemctl disable ssh.socket || true
+systemctl enable ssh.service
 systemctl restart ssh
 
 # --- UFW Firewall ---
