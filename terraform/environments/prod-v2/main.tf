@@ -31,5 +31,4 @@ module "compute" {
   ssh_port              = var.ssh_port
   openclaw_user         = var.openclaw_user
   install_tailscale     = var.install_tailscale
-  use_native_install    = var.use_native_install
 }

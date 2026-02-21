@@ -1,10 +1,10 @@
 # OpenClaw AWS Deployment
 
-Terraform configuration for deploying [OpenClaw](https://openclaw.ai) on AWS EC2 with Docker, secured with hardened SSH and optional Tailscale private networking. Connects to WhatsApp and/or Telegram for messaging.
+Terraform configuration for deploying [OpenClaw](https://openclaw.ai) on AWS EC2 with a native Node.js install, secured with hardened SSH and optional Tailscale private networking. Connects to WhatsApp and/or Telegram for messaging.
 
 ## Architecture
 
-- **EC2 t3.medium** (Ubuntu 24.04) running OpenClaw in Docker containers
+- **EC2 t3.medium** (Ubuntu 24.04) running OpenClaw natively via Node.js 22 LTS
 - **VPC** with public subnet, internet gateway, and restricted security groups
 - **Elastic IP** for stable SSH access across instance stop/start cycles
 - **SSH on port 2222** with key-only auth, root login disabled
@@ -41,12 +41,12 @@ terraform apply
 
 ### Step 2: Configure the S3 Backend
 
-Edit `terraform/environments/prod/providers.tf` and replace `REPLACE_WITH_YOUR_BUCKET_NAME` with the bucket name you created above.
+Edit `terraform/environments/prod-v2/providers.tf` and replace the bucket name with the one you created above.
 
 ### Step 3: Set Your Variables
 
 ```bash
-cd terraform/environments/prod
+cd terraform/environments/prod-v2
 cp terraform.tfvars.example terraform.tfvars
 # Edit terraform.tfvars with your values
 ```
@@ -55,7 +55,7 @@ cp terraform.tfvars.example terraform.tfvars
 
 **Locally:**
 ```bash
-cd terraform/environments/prod
+cd terraform/environments/prod-v2
 terraform init
 terraform plan
 terraform apply
@@ -83,44 +83,33 @@ After the infrastructure is up, SSH in and configure OpenClaw.
 ssh -p 2222 -i ~/.ssh/your-key openclaw@<elastic-ip>
 ```
 
-The user data script has already installed Docker and cloned the OpenClaw repo. Verify:
+The user data script has already installed Node.js, OpenClaw, and ClawHub. Verify:
 
 ```bash
-docker --version
-ls ~/openclaw
+node --version
+openclaw --version
 ```
 
-### 2. Run OpenClaw Docker Setup
+### 2. Run OpenClaw Onboarding
 
 ```bash
-cd ~/openclaw
-./docker-setup.sh
+openclaw onboard
 ```
 
-The onboarding wizard will prompt you. Recommended selections:
+The onboarding wizard will prompt you for your API keys, chat channels, and gateway settings.
 
-| Prompt | Selection |
-|---|---|
-| Gateway mode | Local gateway |
-| Gateway bind | **LAN (0.0.0.0)** -- required for Docker port mapping |
-| Gateway auth | Token |
-| Gateway token | Press Enter to auto-generate |
-| Tailscale exposure | Off |
-| Install daemon | No |
-| API key | Paste your Anthropic (or OpenAI) key |
-| Configure chat channels | Yes |
-| Channel type | Telegram (Bot API), then paste your bot token |
-| Add another channel | **Finish** (do NOT press ESC) |
-| Configure DM access policies | No (default pairing is fine) |
-| Configure skills | No (can add later) |
-| Enable hooks | Skip for now |
+### 3. Set Up Environment Variables
 
-**Important:** Complete every prompt -- do not press ESC to exit early. The config file (`~/.openclaw/openclaw.json`) is only written when the wizard finishes.
-
-### 3. Set Up WhatsApp (Optional)
+Fill in your API keys and secrets:
 
 ```bash
-docker compose run --rm openclaw-cli channels login
+vi ~/.openclaw/.env
+```
+
+### 4. Set Up WhatsApp (Optional)
+
+```bash
+openclaw channels login
 ```
 
 1. A QR code will appear in the terminal
@@ -130,7 +119,7 @@ docker compose run --rm openclaw-cli channels login
 
 **Important:** Use a spare phone number, not your personal one. WhatsApp sessions can disconnect and need re-pairing.
 
-### 4. Set Up Telegram
+### 5. Set Up Telegram
 
 1. Open Telegram and chat with `@BotFather`
 2. Send `/newbot` and follow the prompts to create your bot
@@ -140,28 +129,27 @@ docker compose run --rm openclaw-cli channels login
 If you need to add Telegram **after** initial setup:
 
 ```bash
-cd ~/openclaw
-docker compose run --rm openclaw-cli channels add
+openclaw channels add
 ```
 
-Follow the interactive prompts, then restart the gateway:
+Then restart the gateway:
 
 ```bash
-docker compose restart openclaw-gateway
+systemctl --user restart openclaw-gateway
 ```
 
-### 5. Set Up Google Workspace (gog)
+### 6. Set Up Google Workspace (gog)
 
 The bootstrap script pre-installs [gog](https://github.com/rubiojr/gog) and creates the config directories. To connect your Google accounts:
 
-1. **Add env vars** to `~/openclaw/.env`:
+1. **Add env vars** to `~/.openclaw/.env`:
 
 ```bash
 GOG_ACCOUNT=you@example.com
 GOG_KEYRING_PASSWORD=your-keyring-password
 ```
 
-2. **Authenticate** on the EC2 host (not inside Docker):
+2. **Authenticate** on the EC2 host:
 
 ```bash
 export GOG_KEYRING_PASSWORD="your-keyring-password"
@@ -176,23 +164,9 @@ ssh -p 2222 -i ~/.ssh/your-key -N -L PORT:127.0.0.1:PORT openclaw@<elastic-ip>
 
 Then open the OAuth URL in your browser and complete sign-in.
 
-3. **Fix token permissions** so the Docker container can read them:
+> **Multiple accounts:** Repeat the `gog auth add` step for each Google account. Each auth generates a new callback port that needs its own SSH tunnel.
 
-```bash
-sudo chmod 644 ~/.config/gogcli/keyring/token:*
-```
-
-4. **Test from the container**:
-
-```bash
-docker compose exec openclaw-gateway gog gmail search "is:unread" --max 3
-```
-
-> **Multiple accounts:** Repeat the `gog auth add` step for each Google account. Each auth generates a new callback port that needs its own SSH tunnel. To add accounts with many services, split into smaller batches (e.g. `gmail,calendar` then `drive,contacts`) to avoid URL truncation issues in the browser.
-
-> **Permissions note:** The `~/.config/gogcli` directory is set to `777` so both the host user and Docker container (uid 1000) can access it. After each `gog auth add`, token files default to `600` (owner-only) -- the `chmod 644` step above is required after every new auth.
-
-### 6. Access the Web Dashboard
+### 7. Access the Web Dashboard
 
 From your local machine, set up an SSH tunnel:
 
@@ -200,7 +174,7 @@ From your local machine, set up an SSH tunnel:
 ssh -p 2222 -i ~/.ssh/your-key -N -L 18789:127.0.0.1:18789 openclaw@<elastic-ip>
 ```
 
-Then open this URL in your browser (replace `<token>` with your gateway token from the `.env` file):
+Then open this URL in your browser (replace `<token>` with your gateway token):
 
 ```
 http://localhost:18789/#token=<token>
@@ -209,54 +183,46 @@ http://localhost:18789/#token=<token>
 To retrieve the gateway token:
 
 ```bash
-grep OPENCLAW_GATEWAY_TOKEN ~/openclaw/.env
+grep OPENCLAW_GATEWAY_TOKEN ~/.openclaw/.env
 ```
 
-> **Note:** The `user_data.sh` bootstrap script pre-configures `controlUi.allowInsecureAuth: true` so the dashboard works over HTTP (the SSH tunnel encrypts traffic end-to-end). No manual config changes needed.
+> **Note:** The bootstrap script pre-configures `controlUi.allowInsecureAuth: true` so the dashboard works over HTTP (the SSH tunnel encrypts traffic end-to-end). No manual config changes needed.
 
-> **Token mismatch:** The `.env` file (used by the Docker container) and `~/.openclaw/openclaw.json` (used by the wizard) may have different tokens. The running gateway uses the `.env` token. If the dashboard shows "pairing required", verify the token in your URL matches the one in `.env`.
-
-### 7. Verify Everything Works
+### 8. Verify Everything Works
 
 1. Chat via the web dashboard at http://localhost:18789
 2. Send a message via WhatsApp or Telegram
-3. Check container health: `docker compose ps`
-4. View logs: `docker compose logs -f`
+3. Check service health: `openclaw doctor`
+4. View logs: `journalctl --user -u openclaw-gateway -f`
 
-### 8. Daily Operations
-
-You only need to run `./docker-setup.sh` **once** for initial setup. After that:
+### 9. Daily Operations
 
 ```bash
-cd ~/openclaw
-
 # Start the gateway
-docker compose up -d openclaw-gateway
+systemctl --user start openclaw-gateway
 
 # Stop the gateway
-docker compose down
+systemctl --user stop openclaw-gateway
 
 # Restart after config changes
-docker compose restart openclaw-gateway
+systemctl --user restart openclaw-gateway
 
 # View live logs
-docker compose logs -f openclaw-gateway
+journalctl --user -u openclaw-gateway -f
 
 # Add a channel after initial setup
-docker compose run --rm openclaw-cli channels add
+openclaw channels add
 
 # Update OpenClaw to latest
-cd ~/openclaw && git pull
-docker compose down
-./docker-setup.sh
+npm update -g openclaw
+systemctl --user restart openclaw-gateway
 ```
 
-### 9. Post-Setup Hardening
+### 10. Post-Setup Hardening
 
 - **Set API spend limits**: Go to your Anthropic/OpenAI console and set a monthly budget
-- **Enable sandbox mode**: OpenClaw defaults to sandboxed tool execution in Docker containers
 - **Back up agent memory**: `tar -czvf openclaw-backup-$(date +%F).tar.gz ~/.openclaw/`
-- **Monitor logs**: `docker compose logs -f`
+- **Monitor logs**: `journalctl --user -u openclaw-gateway -f`
 
 ---
 
@@ -273,12 +239,11 @@ docker compose down
 Tips to reduce cost:
 - Use a Reserved Instance or Savings Plan (~$12/month for t3.medium)
 - Stop the instance when not in use (Elastic IP charges $0.005/hr when unattached)
-- Use t3.small ($15/month) if you don't need sandbox containers
 
 ## Tear Down
 
 ```bash
-cd terraform/environments/prod
+cd terraform/environments/prod-v2
 terraform destroy
 ```
 
@@ -291,9 +256,9 @@ terraform/
     networking/               # VPC, subnet, IGW, route tables
     security/                 # Security group, IAM, key pair
     compute/                  # EC2, EBS, Elastic IP, user_data
-      scripts/user_data.sh    # Cloud-init bootstrap script
+      scripts/user_data_native.sh  # Cloud-init bootstrap script
   environments/
-    prod/                     # Root module wiring everything together
+    prod-v2/                  # Root module wiring everything together
 .github/
   workflows/
     terraform-plan.yml        # Runs plan on PRs, posts output as PR comment
