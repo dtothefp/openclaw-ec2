@@ -23,9 +23,10 @@ resource "aws_instance" "openclaw" {
   iam_instance_profile   = var.instance_profile_name
 
   root_block_device {
-    volume_size = var.root_volume_size
-    volume_type = "gp3"
-    encrypted   = true
+    volume_size           = var.root_volume_size
+    volume_type           = "gp3"
+    encrypted             = true
+    delete_on_termination = false
 
     tags = {
       Name    = "${var.project_name}-ebs"
@@ -33,11 +34,14 @@ resource "aws_instance" "openclaw" {
     }
   }
 
-  user_data = templatefile("${path.module}/scripts/user_data.sh", {
-    ssh_port          = var.ssh_port
-    openclaw_user     = var.openclaw_user
-    install_tailscale = var.install_tailscale
-  })
+  user_data = templatefile(
+    "${path.module}/scripts/${var.use_native_install ? "user_data_native.sh" : "user_data.sh"}",
+    {
+      ssh_port          = var.ssh_port
+      openclaw_user     = var.openclaw_user
+      install_tailscale = var.install_tailscale
+    }
+  )
 
   tags = {
     Name    = "${var.project_name}-ec2"
