@@ -14,7 +14,7 @@ resource "aws_security_group" "openclaw" {
     cidr_blocks = var.allowed_ssh_cidrs
   }
 
-  # All outbound traffic (required for API calls, WhatsApp, Telegram, Docker pulls)
+  # All outbound traffic (required for API calls, npm installs, WhatsApp, Telegram)
   egress {
     description = "All outbound traffic"
     from_port   = 0

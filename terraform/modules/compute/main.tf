@@ -35,7 +35,7 @@ resource "aws_instance" "openclaw" {
   }
 
   user_data = templatefile(
-    "${path.module}/scripts/${var.use_native_install ? "user_data_native.sh" : "user_data.sh"}",
+    "${path.module}/scripts/user_data_native.sh",
     {
       ssh_port          = var.ssh_port
       openclaw_user     = var.openclaw_user

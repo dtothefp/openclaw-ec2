@@ -52,9 +52,3 @@ variable "install_tailscale" {
   type        = bool
   default     = false
 }
-
-variable "use_native_install" {
-  description = "Use native Node.js install instead of Docker"
-  type        = bool
-  default     = false
-}

@@ -1,25 +1,16 @@
 name: "Terraform Apply"
-run-name: "Terraform Apply - ${{ inputs.environment }}"
+run-name: "Terraform Apply - Production"
 
 on:
   workflow_dispatch:
-    inputs:
-      environment:
-        description: "Environment to deploy"
-        required: true
-        type: choice
-        options:
-          - prod (Docker)
-          - prod-v2 (Native)
 
 env:
   AWS_REGION: us-west-2
   PROJECT_NAME: openclaw
-  TF_WORKING_DIR: ${{ inputs.environment == 'prod (Docker)' && 'terraform/environments/prod' || 'terraform/environments/prod-v2' }}
 
 jobs:
   terraform:
-    name: "Terraform Apply - ${{ inputs.environment }}"
+    name: "Terraform Apply - Production"
     runs-on: ubuntu-latest
 
     permissions:
@@ -28,7 +19,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: ${{ env.TF_WORKING_DIR }}
+        working-directory: terraform/environments/prod-v2
 
     steps:
       - name: Checkout
