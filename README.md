@@ -54,6 +54,7 @@ cp terraform.tfvars.example terraform.tfvars
 ### Step 4: Deploy
 
 **Locally:**
+
 ```bash
 cd terraform/environments/prod
 terraform init
@@ -67,6 +68,7 @@ Push to a PR to see the plan as a PR comment. Trigger the `terraform-apply` work
 ### Step 5: Note the Outputs
 
 After apply, Terraform will print:
+
 - `elastic_ip` -- the IP address of your instance
 - `ssh_command` -- the exact SSH command to connect
 - `dashboard_tunnel_command` -- the SSH tunnel command for the web dashboard
@@ -99,21 +101,21 @@ cd ~/openclaw
 
 The onboarding wizard will prompt you. Recommended selections:
 
-| Prompt | Selection |
-|---|---|
-| Gateway mode | Local gateway |
-| Gateway bind | **LAN (0.0.0.0)** -- required for Docker port mapping |
-| Gateway auth | Token |
-| Gateway token | Press Enter to auto-generate |
-| Tailscale exposure | Off |
-| Install daemon | No |
-| API key | Paste your Anthropic (or OpenAI) key |
-| Configure chat channels | Yes |
-| Channel type | Telegram (Bot API), then paste your bot token |
-| Add another channel | **Finish** (do NOT press ESC) |
-| Configure DM access policies | No (default pairing is fine) |
-| Configure skills | No (can add later) |
-| Enable hooks | Skip for now |
+| Prompt                       | Selection                                             |
+| ---------------------------- | ----------------------------------------------------- |
+| Gateway mode                 | Local gateway                                         |
+| Gateway bind                 | **LAN (0.0.0.0)** -- required for Docker port mapping |
+| Gateway auth                 | Token                                                 |
+| Gateway token                | Press Enter to auto-generate                          |
+| Tailscale exposure           | Off                                                   |
+| Install daemon               | No                                                    |
+| API key                      | Paste your Anthropic (or OpenAI) key                  |
+| Configure chat channels      | Yes                                                   |
+| Channel type                 | Telegram (Bot API), then paste your bot token         |
+| Add another channel          | **Finish** (do NOT press ESC)                         |
+| Configure DM access policies | No (default pairing is fine)                          |
+| Configure skills             | No (can add later)                                    |
+| Enable hooks                 | Skip for now                                          |
 
 **Important:** Complete every prompt -- do not press ESC to exit early. The config file (`~/.openclaw/openclaw.json`) is only written when the wizard finishes.
 
@@ -159,7 +161,11 @@ The bootstrap script pre-installs [gog](https://github.com/rubiojr/gog) and crea
 ```bash
 GOG_ACCOUNT=you@example.com
 GOG_KEYRING_PASSWORD=your-keyring-password
+OPENROUTER_API_KEY=your-openrouter-api-key
+BRAVE_SEARCH_API_KEY=your-brave-search-api-key
 ```
+
+> **Sub-agents & search:** The bootstrap config delegates sub-agent tasks to a free model via [OpenRouter](https://openrouter.ai) (Kimi K2.5, $0/token) and enables [Brave Search](https://api-dashboard.search.brave.com/) ($5/month free credit = ~1,000 searches/month). Both keys are optional -- the agent works without them but won't be able to spawn cheap sub-agents or do web searches.
 
 2. **Authenticate** on the EC2 host (not inside Docker):
 
@@ -262,15 +268,16 @@ docker compose down
 
 ## Cost Estimate
 
-| Resource | Monthly Cost |
-|---|---|
-| EC2 t3.medium (on-demand) | ~$30 |
-| EBS 30GB gp3 | ~$2.40 |
-| Elastic IP (while attached) | $0 |
-| S3 state bucket | ~$0 |
-| **Total** | **~$33/month** |
+| Resource                    | Monthly Cost   |
+| --------------------------- | -------------- |
+| EC2 t3.medium (on-demand)   | ~$30           |
+| EBS 30GB gp3                | ~$2.40         |
+| Elastic IP (while attached) | $0             |
+| S3 state bucket             | ~$0            |
+| **Total**                   | **~$33/month** |
 
 Tips to reduce cost:
+
 - Use a Reserved Instance or Savings Plan (~$12/month for t3.medium)
 - Stop the instance when not in use (Elastic IP charges $0.005/hr when unattached)
 - Use t3.small ($15/month) if you don't need sandbox containers

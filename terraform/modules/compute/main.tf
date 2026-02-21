@@ -45,7 +45,7 @@ resource "aws_instance" "openclaw" {
   }
 
   lifecycle {
-    ignore_changes = [ami]
+    ignore_changes = [ami, user_data]
   }
 }
 

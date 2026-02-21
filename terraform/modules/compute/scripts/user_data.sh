@@ -71,6 +71,8 @@ su - "$OPENCLAW_USER" -c "git clone https://github.com/openclaw/openclaw.git /ho
 
 # --- Prepare OpenClaw directories ---
 su - "$OPENCLAW_USER" -c "mkdir -p /home/$OPENCLAW_USER/.openclaw/workspace"
+su - "$OPENCLAW_USER" -c "mkdir -p /home/$OPENCLAW_USER/.openclaw/workspace-dev"
+su - "$OPENCLAW_USER" -c "mkdir -p /home/$OPENCLAW_USER/.openclaw/workspace-research"
 # Docker container runs as 'node' (uid 1000) -- must match ownership
 chown -R 1000:1000 "/home/$OPENCLAW_USER/.openclaw"
 chmod -R 775 "/home/$OPENCLAW_USER/.openclaw"
@@ -104,6 +106,8 @@ services:
       LINEAR_DEFAULT_TEAM: $${LINEAR_DEFAULT_TEAM}
       GOG_ACCOUNT: $${GOG_ACCOUNT}
       GOG_KEYRING_PASSWORD: $${GOG_KEYRING_PASSWORD}
+      OPENROUTER_API_KEY: $${OPENROUTER_API_KEY}
+      BRAVE_SEARCH_API_KEY: $${BRAVE_SEARCH_API_KEY}
     volumes:
       - /usr/local/bin/gog:/usr/local/bin/gog:ro
       - /home/openclaw/.config/gogcli:/home/node/.config/gogcli
@@ -114,13 +118,36 @@ services:
 DCEOF
 chown "$OPENCLAW_USER:$OPENCLAW_USER" "/home/$OPENCLAW_USER/openclaw/docker-compose.override.yml"
 
-# Pre-seed config to allow dashboard access over HTTP (SSH tunnel)
+# Pre-seed config: dashboard over HTTP (SSH tunnel), sub-agent model delegation,
+# and Brave Search skill. API keys are passed via docker-compose environment.
 cat > "/home/$OPENCLAW_USER/.openclaw/openclaw.json" <<'CFGEOF'
 {
   "gateway": {
     "controlUi": {
       "enabled": true,
       "allowInsecureAuth": true
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "anthropic/claude-sonnet-4-5",
+        "fallbacks": ["openrouter/moonshotai/kimi-k2.5"]
+      },
+      "subagents": {
+        "model": "openrouter/moonshotai/kimi-k2.5",
+        "maxSpawnDepth": 2,
+        "maxChildrenPerAgent": 5,
+        "maxConcurrent": 4,
+        "archiveAfterMinutes": 120
+      }
+    }
+  },
+  "skills": {
+    "entries": {
+      "brave-search": {
+        "enabled": true
+      }
     }
   }
 }
