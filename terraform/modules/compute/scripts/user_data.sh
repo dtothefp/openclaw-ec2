@@ -86,12 +86,11 @@ GOG_CONFIG="/home/$OPENCLAW_USER/.config/gogcli"
 su - "$OPENCLAW_USER" -c "mkdir -p $GOG_CONFIG/keyring"
 chmod -R 777 "$GOG_CONFIG"
 
-# Install gogcli binary
+# Install gog binary
 GOG_VERSION="0.11.0"
 curl -fsSL "https://github.com/steipete/gogcli/releases/download/v$GOG_VERSION/gogcli_$${GOG_VERSION}_linux_amd64.tar.gz" \
-  | tar -xz -C /usr/local/bin gogcli
-chmod 755 /usr/local/bin/gogcli
-ln -sf /usr/local/bin/gogcli /usr/local/bin/gog
+  | tar -xz -C /usr/local/bin gog
+chmod 755 /usr/local/bin/gog
 
 # --- Pre-seed docker-compose.override.yml ---
 # Mounts gog binary + config into the container and passes env vars.

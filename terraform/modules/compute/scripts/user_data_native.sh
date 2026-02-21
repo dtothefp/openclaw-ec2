@@ -77,12 +77,11 @@ apt-get install -y gh
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ln -sf /root/.local/bin/uv /usr/local/bin/uv || true
 
-# --- Install gogcli (Google Workspace CLI) ---
+# --- Install gog (Google Workspace CLI) ---
 GOG_VERSION="0.11.0"
 curl -fsSL "https://github.com/steipete/gogcli/releases/download/v$GOG_VERSION/gogcli_$${GOG_VERSION}_linux_amd64.tar.gz" \
-  | tar -xz -C /usr/local/bin gogcli
-chmod 755 /usr/local/bin/gogcli
-ln -sf /usr/local/bin/gogcli /usr/local/bin/gog
+  | tar -xz -C /usr/local/bin gog
+chmod 755 /usr/local/bin/gog
 
 # --- Install Tailscale (optional) ---
 if [ "$INSTALL_TAILSCALE" = "true" ]; then
