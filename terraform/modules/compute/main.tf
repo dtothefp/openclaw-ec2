@@ -33,11 +33,14 @@ resource "aws_instance" "openclaw" {
     }
   }
 
-  user_data = templatefile("${path.module}/scripts/user_data.sh", {
-    ssh_port          = var.ssh_port
-    openclaw_user     = var.openclaw_user
-    install_tailscale = var.install_tailscale
-  })
+  user_data = templatefile(
+    "${path.module}/scripts/${var.use_native_install ? "user_data_native.sh" : "user_data.sh"}",
+    {
+      ssh_port          = var.ssh_port
+      openclaw_user     = var.openclaw_user
+      install_tailscale = var.install_tailscale
+    }
+  )
 
   tags = {
     Name    = "${var.project_name}-ec2"

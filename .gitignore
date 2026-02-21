@@ -16,6 +16,9 @@ override.tf.json
 *.pem
 *.key
 
+# Chat logs
+chats/
+
 # OS
 .DS_Store
 Thumbs.db
