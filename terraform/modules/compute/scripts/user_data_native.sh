@@ -38,6 +38,7 @@ SSHEOF
 
 systemctl stop ssh.socket || true
 systemctl disable ssh.socket || true
+systemctl enable ssh.service
 systemctl restart ssh
 
 # --- UFW Firewall ---
