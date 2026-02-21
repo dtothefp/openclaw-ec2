@@ -19,6 +19,9 @@ override.tf.json
 # Chat logs
 chats/
 
+# Migration archive
+openclaw-migration.tar.gz
+
 # OS
 .DS_Store
 Thumbs.db
