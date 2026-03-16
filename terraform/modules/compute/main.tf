@@ -26,7 +26,7 @@ resource "aws_instance" "openclaw" {
     volume_size           = var.root_volume_size
     volume_type           = "gp3"
     encrypted             = true
-    delete_on_termination = false
+    delete_on_termination = true
 
     tags = {
       Name    = "${var.project_name}-ebs"
